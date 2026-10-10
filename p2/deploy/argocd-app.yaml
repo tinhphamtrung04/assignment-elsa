@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: 'https://github.com/tinhphamtrung04/assignment-elsa.git'
     targetRevision: HEAD
-    path: p2/charts
+    path: p2/charts/quote-api
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: default

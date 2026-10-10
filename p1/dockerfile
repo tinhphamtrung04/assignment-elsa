@@ -1,18 +1,36 @@
-# Stage 1: Build/Staging environment (if compiling dependencies is needed)
+# Stage 1: Build/Staging environment
 FROM python:3.11-alpine AS builder
+
 WORKDIR /app
+
+# Install system dependencies if your requirements need compilation
+RUN apk add --no-cache gcc musl-dev libffi-dev
+
+# If you have a requirements.txt file, install dependencies into a local prefix directory
+# COPY requirements.txt .
+# RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
 COPY api.py .
 
 # Stage 2: Final lightweight run image
-FROM python:3.11-alpine AS runner
+FROM python:3.11-alpine AS final
+
+# Prevent Python from writing .pyc files and buffer stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Create a non-root system user and group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
+
+# Copy installed dependencies from builder (if using requirements.txt)
+# COPY --from=builder /install /usr/local
+
+# Copy application source code
 COPY --from=builder /app/api.py .
 
-# Switch to non-root user
+# Switch to non-root user for security best practices
 USER appuser
 
 EXPOSE 8080

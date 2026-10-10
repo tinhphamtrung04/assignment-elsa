@@ -3,7 +3,7 @@ replicaCount: 3
 image:
   repository: ghcr.io/tinhphamtrung04/assignment1
   pullPolicy: IfNotPresent
-  tag: "c30950884b" # Overridden by ArgoCD/Git SHA
+  tag: "64aded6" # Overridden by ArgoCD/Git SHA
 
 service:
   type: ClusterIP

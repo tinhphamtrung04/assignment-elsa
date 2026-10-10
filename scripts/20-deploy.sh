@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
 echo "==> Installing ArgoCD..."
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 # kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
@@ -11,10 +14,18 @@ echo "==> Waiting for ArgoCD server to be ready..."
 kubectl rollout status deployment argocd-server -n argocd --timeout=120s
 
 echo "==> Applying ArgoCD Application manifest..."
-kubectl apply -f ../p2/deploy/argocd-app.yaml
+kubectl apply -f "$ROOT_DIR/p2/deploy/argocd-app.yaml"
 
 echo "==> Triggering initial sync check..."
-argocd app sync quote-api --namespace argocd || echo "ArgoCD CLI not found or managed via controller, skipping manual sync."
+argocd app sync quote-api --namespace argocd || echo "ArgoCD CLI not found; waiting for Argo CD reconciliation."
+
+echo "==> Waiting for Argo CD to create the application Deployment..."
+for attempt in $(seq 1 90); do
+  if kubectl get deployment/quote-api >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
 
 echo "==> Waiting for quote-api deployment rollout..."
 kubectl rollout status deployment/quote-api --timeout=180s

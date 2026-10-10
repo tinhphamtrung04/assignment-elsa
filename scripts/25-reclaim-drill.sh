@@ -1,48 +1,100 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-echo "==> Finding a worker node running a quote-api pod..."
+NAMESPACE="default"
+SELECTOR="app.kubernetes.io/name=quote-api"
+CURL_POD="reclaim-service-check"
+CURL_LOG="/tmp/${CURL_POD}.log"
+TARGET_NODE=""
+SURVIVOR_NODE=""
+LOG_PID=""
 
-# Grab all pods, filter for anything containing 'quote-api', and get their node names
-SPOT_NODE=$(kubectl get pods -o wide --no-headers | grep "quote-api" | awk '{print $7}' | head -n 1)
+cleanup() {
+  [ -z "$LOG_PID" ] || kill "$LOG_PID" 2>/dev/null || true
+  kubectl delete pod "$CURL_POD" -n "$NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  if [ -n "$TARGET_NODE" ]; then
+    kubectl uncordon "$TARGET_NODE" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
 
-if [ -z "$SPOT_NODE" ] || [ "$SPOT_NODE" = "<none>" ]; then
-  echo "Error: Could not find any active node running quote-api pods. Current pods:"
-  kubectl get pods -o wide
+echo "==> Finding a quote-api pod on a spot node..."
+while read -r POD NODE PHASE; do
+  if [ "$PHASE" = "Running" ] && [ "$(kubectl get node "$NODE" -o jsonpath='{.metadata.labels.acme\.io/capacity}')" = "spot" ]; then
+    TARGET_NODE="$NODE"
+    break
+  fi
+done < <(kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" \
+  -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.nodeName}{" "}{.status.phase}{"\n"}{end}')
+
+if [ -z "$TARGET_NODE" ]; then
+  echo "ERROR: no running quote-api pod found on a spot node" >&2
   exit 1
 fi
 
-echo "==> Selected target node to drain (simulate spot reclaim): $SPOT_NODE"
+echo "==> Finding a surviving worker node..."
+while read -r POD NODE PHASE; do
+  if [ "$PHASE" = "Running" ] && [ "$NODE" != "$TARGET_NODE" ]; then
+    SURVIVOR_NODE="$NODE"
+    break
+  fi
+done < <(kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" \
+  -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.nodeName}{" "}{.status.phase}{"\n"}{end}')
 
-echo "==> Starting background traffic generator (curl loop)..."
-(
-  while true; do
-    curl -s -o /dev/null -w "%{http_code} " http://localhost:8080/api/quote || echo "ERR"
-    sleep 0.2
-  done
-) &
-CURL_LOOP_PID=$!
+if [ -z "$SURVIVOR_NODE" ]; then
+  echo "ERROR: no running quote-api pod exists outside $TARGET_NODE" >&2
+  exit 1
+fi
 
-# Setup cleanup trap to ensure port-forward and curl loop terminate
-trap "kill $CURL_LOOP_PID 2>/dev/null; kill $PF_PID 2>/dev/null" EXIT
+echo "==> Starting in-cluster curl loop on $SURVIVOR_NODE"
+kubectl delete pod "$CURL_POD" -n "$NAMESPACE" --ignore-not-found >/dev/null
+kubectl run "$CURL_POD" -n "$NAMESPACE" \
+  --image=curlimages/curl:8.7.1 \
+  --restart=Never \
+  --overrides="{\"spec\":{\"nodeName\":\"$SURVIVOR_NODE\"}}" \
+  --command -- sh -c '
+    end=$(( $(date +%s) + 120 ))
+    while [ "$(date +%s)" -lt "$end" ]; do
+      status=$(curl -s -o /dev/null -w "%{http_code}" \
+        http://quote-api.default.svc.cluster.local/api/quote || true)
+      echo "$status"
+      [ "$status" = "200" ] || exit 1
+      sleep 0.2
+    done
+  ' >/dev/null
 
-echo "==> Establishing background port-forward..."
-kubectl port-forward svc/quote-api 8080:80 >/dev/null 2>&1 &
-PF_PID=$!
-sleep 2
+if ! kubectl wait --for=jsonpath='{.status.phase}'=Running \
+  pod/"$CURL_POD" -n "$NAMESPACE" --timeout=120s; then
+  echo "ERROR: curl pod did not reach Running state. Diagnostics:" >&2
+  kubectl get pod "$CURL_POD" -n "$NAMESPACE" -o wide >&2 || true
+  kubectl describe pod "$CURL_POD" -n "$NAMESPACE" >&2 || true
+  exit 1
+fi
+kubectl logs -f pod/"$CURL_POD" -n "$NAMESPACE" >"$CURL_LOG" 2>&1 &
+LOG_PID=$!
 
-echo "==> Cordoning and draining node: $SPOT_NODE"
-kubectl cordon "$SPOT_NODE"
-kubectl drain "$SPOT_NODE" --ignore-daemonsets --delete-emptydir-data --force --timeout=60s
+echo "==> Draining spot node: $TARGET_NODE"
+kubectl cordon "$TARGET_NODE"
+kubectl drain "$TARGET_NODE" --ignore-daemonsets --delete-emptydir-data --force --timeout=120s
 
-echo "==> Verifying pod rescheduling and uninterrupted availability..."
-for i in {1..10}; do
-  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/quote || echo "FAIL")
-  echo "Check $i: HTTP Status -> $STATUS"
-  sleep 1
-done
+echo "==> Waiting for quote-api pods to reschedule..."
+kubectl wait --for=condition=Ready pod -n "$NAMESPACE" -l "$SELECTOR" --timeout=120s
+kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" -o wide
 
-echo "==> Uncordoning node: $SPOT_NODE"
-kubectl uncordon "$SPOT_NODE"
+sleep 3
+kill "$LOG_PID" 2>/dev/null || true
+LOG_PID=""
 
-echo "==> Reclaim drill completed successfully!"
+echo "==> Checking Service responses from inside the cluster..."
+cat "$CURL_LOG"
+if awk '$0 != "200" { failed=1 } END { exit failed }' "$CURL_LOG"; then
+  echo "PASS: quote-api Service returned only HTTP 200 responses during the reclaim drill"
+else
+  echo "FAIL: quote-api Service returned a non-200 response" >&2
+  exit 1
+fi
+
+echo "==> Uncordoning node: $TARGET_NODE"
+kubectl uncordon "$TARGET_NODE"
+TARGET_NODE=""
+echo "==> Service availability drill completed successfully"

@@ -47,6 +47,48 @@ securityContext:
       - ALL
 
 nodePlacement:
-  spotKey: "node.kubernetes.io/lifecycle"
+  capacityKey: "acme.io/capacity"
   spotValue: "spot"
   onDemandValue: "on-demand"
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: acme.io/capacity
+              operator: In
+              values:
+                - spot
+                - on-demand
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: acme.io/capacity
+              operator: In
+              values:
+                - spot
+      - weight: 50
+        preference:
+          matchExpressions:
+            - key: acme.io/capacity
+              operator: In
+              values:
+                - on-demand
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: acme.io/capacity
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: quote-api
+        app.kubernetes.io/instance: quote-api
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: quote-api
+        app.kubernetes.io/instance: quote-api

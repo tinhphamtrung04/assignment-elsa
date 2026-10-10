@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CLUSTER_NAME="asignment-1"
 
 echo "==> Checking if k3d cluster '$CLUSTER_NAME' already exists..."
@@ -15,8 +16,8 @@ else
 fi
 
 echo "==> Running troubleshoot/prepare.sh to label and taint nodes..."
-if [ -f "../troubleshoot/prepare.sh" ]; then
-  bash ../troubleshoot/prepare.sh
+if [ -f "$SCRIPT_DIR/../troubleshoot/prepare.sh" ]; then
+  bash "$SCRIPT_DIR/../troubleshoot/prepare.sh"
 else
   echo "==> Fallback: Applying standard production labels/taints manually..."
   NODES=$(kubectl get nodes --no-headers -l '!node-role.kubernetes.io/control-plane' -o name)

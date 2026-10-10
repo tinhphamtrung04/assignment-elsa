@@ -2,12 +2,12 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "quote-service.fullname" . }}
+  name: {{ include "quote-api.fullname" . }}
   labels:
-    {{- include "quote-service.labels" . | nindent 4 }}
+    {{- include "quote-api.labels" . | nindent 4 }}
 spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels:
-      {{- include "quote-service.selectorLabels" . | nindent 6 }}
+      {{- include "quote-api.selectorLabels" . | nindent 6 }}
 {{- end -}}

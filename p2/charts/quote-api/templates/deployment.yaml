@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "quote-service.fullname" . }}
+  name: {{ include "quote-api.fullname" . }}
   labels:
-    {{- include "quote-service.labels" . | nindent 4 }}
+    {{- include "quote-api.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "quote-service.selectorLabels" . | nindent 6 }}
+      {{- include "quote-api.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "quote-service.selectorLabels" . | nindent 8 }}
+        {{- include "quote-api.selectorLabels" . | nindent 8 }}
     spec:
       securityContext:
         runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}

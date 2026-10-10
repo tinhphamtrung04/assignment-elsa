@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  toolbox:
+    image: ubuntu:22.04
+    container_name: k3d-toolbox
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        apt-get update && apt-get install -y curl bash git docker.io
+        
+        # Install k3d
+        curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.7.4 bash
+        
+        # Install kubectl
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl && mv kubectl /usr/local/bin/
+        
+        # Install helm
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        
+        echo "==> Toolbox ready! Keeping container alive..."
+        tail -f /dev/null
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    environment:
+      - KUBECONFIG=/root/.kube/config
+      - DOCKER_API_VERSION=1.44

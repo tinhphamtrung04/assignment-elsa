@@ -1,1 +1,1 @@
-k3d cluster create asignment --servers 4
+k3d cluster create asignment --servers 1 --agents 4

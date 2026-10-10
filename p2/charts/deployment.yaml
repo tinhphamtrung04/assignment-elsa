@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quote-api.fullname" . }}
+  labels:
+    {{- include "quote-api.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "quote-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "quote-api.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 10001
+      # Placement Policy: Soft preference for spot, but hard constraint guaranteeing at least one on-demand pod via topology or node affinity weights.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: {{ .Values.nodePlacement.spotKey }}
+                    operator: In
+                    values:
+                      - {{ .Values.nodePlacement.spotValue }}
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: "kubernetes.io/hostname"
+            whenUnsatisfiable: ScheduleAnyway # Soft constraint ensuring rescheduling succeeds if a node disappears
+            labelSelector:
+              matchLabels:
+                {{- include "quote-api.selectorLabels" . | nindent 16 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

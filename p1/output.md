@@ -1,0 +1,1 @@
+docker push ghcr.io/tinhphamtrung04/assignment1:c30950884b

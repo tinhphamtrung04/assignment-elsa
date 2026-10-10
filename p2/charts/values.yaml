@@ -1,0 +1,52 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/tinhphamtrung04/assignment1
+  pullPolicy: IfNotPresent
+  tag: "c30950884b" # Overridden by ArgoCD/Git SHA
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: quote-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2 # Ensures rolling updates/drains do not take down all pods
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  capabilities:
+    drop:
+      - ALL
+
+nodePlacement:
+  spotKey: "node.kubernetes.io/lifecycle"
+  spotValue: "spot"
+  onDemandValue: "on-demand"

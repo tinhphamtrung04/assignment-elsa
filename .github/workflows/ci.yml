@@ -56,7 +56,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,format=short
+            type=sha,format=short,prefix=
 
       - name: Build and push image
         uses: docker/build-push-action@v6

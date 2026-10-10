@@ -9,7 +9,7 @@ echo "==> Waiting for ArgoCD server to be ready..."
 kubectl rollout status deployment argocd-server -n argocd --timeout=120s
 
 echo "==> Applying ArgoCD Application manifest..."
-kubectl apply -f deploy/argocd-app.yaml
+kubectl apply -f ../p2/deploy/argocd-app.yaml
 
 echo "==> Triggering initial sync check..."
 argocd app sync quote-api --namespace argocd || echo "ArgoCD CLI not found or managed via controller, skipping manual sync."

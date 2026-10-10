@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
-echo "==> Finding a spot node running a quote-api pod..."
-SPOT_NODE=$(kubectl get pods -l app.kubernetes.io/name=quote-api -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | head -n 1)
+echo "==> Finding a worker node running a quote-api pod..."
 
-if [ -z "$SPOT_NODE" ]; then
-  echo "Error: No active nodes found running quote-api pods."
+# Grab all pods, filter for anything containing 'quote-api', and get their node names
+SPOT_NODE=$(kubectl get pods -o wide --no-headers | grep "quote-api" | awk '{print $7}' | head -n 1)
+
+if [ -z "$SPOT_NODE" ] || [ "$SPOT_NODE" = "<none>" ]; then
+  echo "Error: Could not find any active node running quote-api pods. Current pods:"
+  kubectl get pods -o wide
   exit 1
 fi
 

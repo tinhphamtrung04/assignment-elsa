@@ -1,6 +1,6 @@
 apiVersion: v2
 name: quote-api
-description: A Helm chart for the motivational quote Python API
+description: A custom Helm chart for the quote-api service with resilience and placement policies.
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

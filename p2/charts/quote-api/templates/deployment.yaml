@@ -1,66 +1,52 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "quote-api.fullname" . }}
+  name: {{ include "quote-service.fullname" . }}
   labels:
-    {{- include "quote-api.labels" . | nindent 4 }}
+    {{- include "quote-service.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "quote-api.selectorLabels" . | nindent 6 }}
+      {{- include "quote-service.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "quote-api.selectorLabels" . | nindent 8 }}
+        {{- include "quote-service.selectorLabels" . | nindent 8 }}
     spec:
       securityContext:
-        fsGroup: 10001
-      # Placement Policy: Soft preference for spot, but hard constraint guaranteeing at least one on-demand pod via topology or node affinity weights.
-      affinity:
-        nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              preference:
-                matchExpressions:
-                  - key: {{ .Values.nodePlacement.spotKey }}
-                    operator: In
-                    values:
-                      - {{ .Values.nodePlacement.spotValue }}
-        topologySpreadConstraints:
-          - maxSkew: 1
-            topologyKey: "kubernetes.io/hostname"
-            whenUnsatisfiable: ScheduleAnyway # Soft constraint ensuring rescheduling succeeds if a node disappears
-            labelSelector:
-              matchLabels:
-                {{- include "quote-api.selectorLabels" . | nindent 16 }}
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.securityContext.runAsUser }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 8000
               protocol: TCP
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8080
+              port: http
             initialDelaySeconds: 3
-            periodSeconds: 5
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 8080
+              port: http
             initialDelaySeconds: 3
-            periodSeconds: 5
+            periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-      volumes:
-        - name: tmp
-          emptyDir: {}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

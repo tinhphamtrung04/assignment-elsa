@@ -27,7 +27,7 @@ CURL_LOOP_PID=$!
 trap "kill $CURL_LOOP_PID 2>/dev/null; kill $PF_PID 2>/dev/null" EXIT
 
 echo "==> Establishing background port-forward..."
-kubectl port-forward svc/quote-api-quote-api 8080:80 >/dev/null 2>&1 &
+kubectl port-forward svc/quote-api 8080:80 >/dev/null 2>&1 &
 PF_PID=$!
 sleep 2
 

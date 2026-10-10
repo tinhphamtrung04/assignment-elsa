@@ -17,10 +17,10 @@ echo "==> Triggering initial sync check..."
 argocd app sync quote-api --namespace argocd || echo "ArgoCD CLI not found or managed via controller, skipping manual sync."
 
 echo "==> Waiting for quote-api deployment rollout..."
-kubectl rollout status deployment/quote-api-quote-api --timeout=180s
+kubectl rollout status deployment/quote-api --timeout=180s
 
 echo "==> Setup complete! Checking local curl capability..."
-kubectl port-forward svc/quote-api-quote-api 8080:80 &
+kubectl port-forward svc/quote-api 8080:80 &
 PF_PID=$!
 sleep 3
 curl -s http://localhost:8080/api/quote

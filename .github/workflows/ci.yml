@@ -19,26 +19,17 @@ env:
 
 jobs:
   quality:
-    name: SonarCloud quality gate
+    name: Semgrep quality gate
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Scan with SonarCloud and fail on a red quality gate
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
-        with:
-          args: >
-            -Dsonar.organization=tinhphamtrung04
-            -Dsonar.projectKey=tinhphamtrung04_assignment-elsa
-            -Dsonar.sources=p1
-            -Dsonar.qualitygate.wait=true
-            -Dsonar.qualitygate.timeout=300
+      - name: Install Semgrep
+        run: python -m pip install --disable-pip-version-check semgrep
+
+      - name: Run Semgrep and fail on findings
+        run: semgrep scan --config p/python --error --metrics=off p1
 
   build-and-push:
     name: Build and push image

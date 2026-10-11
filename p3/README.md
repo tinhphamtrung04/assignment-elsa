@@ -13,6 +13,8 @@ docker compose up -d
 ./scripts/run-all.sh
 ```
 
+The toolbox healthcheck becomes healthy only after the four-worker k3d cluster is reachable. `run-all.sh` uses `docker compose up -d --wait` internally and then performs an additional Kubernetes readiness check. If Compose must wait in the same manual command, use `docker compose up -d --wait`.
+
 For the current toolbox workflow, run the numbered scripts inside the toolbox container:
 
 ```bash
@@ -44,7 +46,7 @@ kubectl apply -f troubleshoot/fixed-app.yaml
 ```mermaid
 flowchart LR
     Dev["Developer / reviewer"] --> Compose["docker compose"]
-    Compose --> Toolbox["Toolbox container\nkubectl / Helm / scripts"]
+    Compose --> Toolbox["Toolbox container\nkubectl / Helm / Terraform / k6"]
     Toolbox --> K3d["Local k3d Kubernetes cluster"]
     K3d --> Spot["2 spot workers\nacme.io/capacity=spot"]
     K3d --> OnDemand["1 on-demand worker\nacme.io/capacity=on-demand"]
@@ -56,7 +58,7 @@ flowchart LR
     Toolbox --> Argo["Argo CD Application"]
     Argo --> Repo["Git repository\np2/charts/quote-api"]
     Argo --> Helm["Helm release"]
-    Helm --> App["quote-api Deployment\n3+ replicas"]
+    Helm --> App["quote-api workloads\n1 on-demand + spot-preferred replicas"]
     App --> Service["ClusterIP Service :80 → :8080"]
     Service --> Ingress["Ingress\nquote-api.local"]
     Ingress --> Client["HTTP client"]
@@ -68,7 +70,6 @@ Argo CD watches the repository path configured in `p2/deploy/argocd-app.yaml`, r
 
 | Script | Purpose | When to run |
 |---|---|---|
-| `scripts/00-env.sh` | Shows Docker containers related to the local environment. | Optional environment check. |
 | `scripts/run-all.sh` | Starts the toolbox and runs the complete local CORE flow from the repository root. | Golden Rule entrypoint. |
 | `scripts/10-setup.sh` | Creates the local k3d cluster and prepares node labels/taints. | First cluster setup. |
 | `scripts/20-deploy.sh` | Installs Argo CD, applies the Argo CD Application, waits for the API rollout, and checks the API. | After cluster setup. |
@@ -83,6 +84,7 @@ Argo CD watches the repository path configured in `p2/deploy/argocd-app.yaml`, r
 - The image runs as a non-root user and Kubernetes additionally enforces a non-root UID, privilege escalation disabled, and read-only root filesystem.
 - Health and readiness probes use separate `/healthz` and `/readyz` endpoints so Kubernetes can distinguish process liveness from traffic readiness.
 - The Service is internal by default (`ClusterIP`); external access is represented by the Ingress, while local scripts use port-forwarding or an in-cluster Service check.
+- The chart keeps one baseline replica on an on-demand node with required affinity, while a separate spot-preferred workload supplies the remaining capacity and can fall back to on-demand. Both workloads share the Service; the HPA scales the spot-preferred workload without removing the on-demand baseline.
 - The reclaim test uses an in-cluster curl Pod instead of relying on a host-side port-forward. A Service port-forward can disconnect when its selected backend Pod is evicted even though the Service is healthy.
 - The Part 3 fix preserves the provided default-deny NetworkPolicy and adds only DNS and smoke-client-to-web exceptions.
 - The local harness is intentionally lightweight and does not reproduce cloud load balancers, managed node groups, or cloud identity providers.
@@ -116,4 +118,4 @@ In production, Argo CD remains the deployment control plane, with separate node 
 
 ## Current scope
 
-Core application, Helm/Argo CD deployment, reclaim drill, and Part 3 troubleshooting artifacts are included. Parts 4–6 and the required Part 7 operations answers still need to be added before final submission.
+Core application, Helm/Argo CD deployment, reclaim drill, Part 3 troubleshooting artifacts, the Part 4 GitHub Actions migration, and the required Part 7 operations are included. Parts 5 and 6 are intentionally not included because the assignment requires selecting at least one of Parts 4–6.

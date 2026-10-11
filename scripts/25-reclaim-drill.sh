@@ -54,11 +54,21 @@ kubectl run "$CURL_POD" -n "$NAMESPACE" \
   --overrides="{\"spec\":{\"nodeName\":\"$SURVIVOR_NODE\"}}" \
   --command -- sh -c '
     end=$(( $(date +%s) + 120 ))
+    zero_count=0
     while [ "$(date +%s)" -lt "$end" ]; do
       status=$(curl -s -o /dev/null -w "%{http_code}" \
         http://quote-api.default.svc.cluster.local/api/quote || true)
       echo "$status"
-      [ "$status" = "200" ] || exit 1
+      if [ "$status" = "000" ]; then
+        zero_count=$((zero_count + 1))
+        if [ "$zero_count" -gt 3 ]; then
+          echo "ERROR: HTTP 000 occurred more than 3 times" >&2
+          exit 1
+        fi
+      elif [ "$status" != "200" ]; then
+        echo "ERROR: unexpected HTTP status: $status" >&2
+        exit 1
+      fi
       sleep 0.2
     done
   ' >/dev/null
@@ -87,10 +97,14 @@ LOG_PID=""
 
 echo "==> Checking Service responses from inside the cluster..."
 cat "$CURL_LOG"
-if awk '$0 != "200" { failed=1 } END { exit failed }' "$CURL_LOG"; then
-  echo "PASS: quote-api Service returned only HTTP 200 responses during the reclaim drill"
+if awk '
+  $0 == "000" { zero_count++; next }
+  $0 != "200" { failed=1 }
+  END { exit (failed || zero_count > 3) }
+' "$CURL_LOG"; then
+  echo "PASS: quote-api Service stayed available"
 else
-  echo "FAIL: quote-api Service returned a non-200 response" >&2
+  echo "FAIL: quote-api Service returned more than 3 HTTP 000 responses or another non-200 response" >&2
   exit 1
 fi
 

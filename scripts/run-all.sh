@@ -5,14 +5,20 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo "==> Starting the toolbox container..."
-docker compose up -d toolbox
+docker compose up -d --wait --wait-timeout 600
 
-echo "==> Waiting for kubectl, Helm, and k3d inside the toolbox..."
+echo "==> Compose services are healthy"
+docker compose ps
+
+echo "==> Waiting for toolbox dependencies and the local Kubernetes cluster..."
 docker compose exec -T toolbox bash -lc '
   for attempt in $(seq 1 120); do
     if command -v kubectl >/dev/null 2>&1 &&
        command -v helm >/dev/null 2>&1 &&
-       command -v k3d >/dev/null 2>&1; then
+       command -v k3d >/dev/null 2>&1 &&
+       command -v terraform >/dev/null 2>&1 &&
+       command -v k6 >/dev/null 2>&1 &&
+       kubectl get nodes >/dev/null 2>&1; then
       exit 0
     fi
     sleep 2

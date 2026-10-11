@@ -21,7 +21,8 @@ argocd app sync quote-api --namespace argocd || echo "ArgoCD CLI not found; wait
 
 echo "==> Waiting for Argo CD to create the application Deployment..."
 for attempt in $(seq 1 90); do
-  if kubectl get deployment/quote-api >/dev/null 2>&1; then
+  if kubectl get deployment/quote-api-on-demand >/dev/null 2>&1 && \
+     kubectl get deployment/quote-api-spot >/dev/null 2>&1; then
     break
   fi
   sleep 2

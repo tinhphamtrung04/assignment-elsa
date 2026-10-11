@@ -75,6 +75,7 @@ Argo CD watches the repository path configured in `p2/deploy/argocd-app.yaml`, r
 | `troubleshoot/prepare.sh` | Labels two spot nodes, one on-demand node, and taints the GPU node. | After cluster creation. |
 | `troubleshoot/verify.sh` | Verifies Part 3 workloads, node placement, Service endpoints, NetworkPolicy, and smoke test. | After applying the fixed manifests. |
 | `scripts/25-reclaim-drill.sh` | Drains a spot node and verifies Service availability and rescheduling. | After Argo CD deployment. |
+| `scripts/99-cleanup.sh` | Deletes the local k3d cluster, toolbox container, Compose resources, and project volumes. | When tearing down the local environment. |
 
 ## Design decisions and trade-offs
 

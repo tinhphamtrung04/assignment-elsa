@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-CLUSTER_NAME="asignment-1"
+CLUSTER_NAME="assignment"
 
 echo "==> Checking if k3d cluster '$CLUSTER_NAME' already exists..."
 if k3d cluster list | grep -q "$CLUSTER_NAME"; then

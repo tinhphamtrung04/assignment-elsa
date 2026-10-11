@@ -28,6 +28,7 @@ docker compose exec -T toolbox bash -lc '
   bash scripts/10-setup.sh
   bash scripts/20-deploy.sh
   kubectl apply -f troubleshoot/broken-app.yaml
+  bash troubleshoot/verify.sh
   kubectl apply -f troubleshoot/fixed-app.yaml
   bash troubleshoot/verify.sh
   bash scripts/25-reclaim-drill.sh

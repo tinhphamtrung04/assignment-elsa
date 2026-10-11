@@ -6,7 +6,7 @@ The workflow is `.github/workflows/ci.yml`.
 
 ## Migrated CI/CD flow
 
-![CI/CD migration flow](docs/cicd-flow.png)
+![CI/CD migration flow](../docs/cicd-flow.png)
 
 - The GitLab `sonar_check` job was replaced with a Semgrep scan. It runs on pull requests and pushes, uses the Python ruleset, and invokes `semgrep scan --error`, so findings fail the job. The old `allow_failure: true` behavior was intentionally removed.
 - The legacy Node.js unit-test job was removed because this service is Python and has no Node package or npm test suite. The Python source is checked by Semgrep and the container build validates the runtime packaging.
